@@ -116,7 +116,34 @@ def handle_calculate_IK(req):
             rospy.loginfo("values: ({0},{1},{2}) ({3},{4},{5})".format(pz,py,pz,roll,pitch,yaw))
             # Calculate joint angles using Geometric IK method
             print("gonna calculate the IK")
-		
+            
+            R_roll = rot_x(roll)
+            R_pitch = rot_y(pitch)
+            R_yaw = rot_z(yaw)            
+            Rrpy = R_roll * R_pitch * R_yaw
+            n = Rrpy.col(2)
+
+            d67 = s[d6] + s[d7]
+            wx = px - (d67) * n[0]
+            wy = py - (d67) * n[1]
+            wz = pz - (d67) * n[2]
+            print("Got wrist center ({0},{1},{2})".format(wx, wy, wz))
+
+            theta1 = atan2(wy, wx)
+            r = sqrt(wy**2 + wx**2)
+            dia = sqrt(r**2 + (wz - s[d1])**2)
+            ang1 = atan2(wz - s[d1], r)
+            ang2 = arg_law_of_cosine(s[a2], s[a1], dia)
+            ang3 = arg_law_of_cosine(dia, s[a1], s[a2])
+            theta2 = ang2 + ang1
+            theta3 = ang3 - pi
+            print("Got first three angles ({0},{1},{2})".format(theta1, theta2, theta3))
+
+            T0_3s = T0_3.subs({q1: theta1, q2: theta2, q3: theta3})
+            T0_3s.col_del(-1)
+            T0_3s.row_del(-1)
+            R3_6 = T0_3s.T * Rrpy
+            print("Got the final 3_6 matrix {0}".format(R3_6))
             
             
             # Populate response for the IK request
@@ -128,11 +155,33 @@ def handle_calculate_IK(req):
         return CalculateIKResponse(joint_trajectory_list)
 
 
+def arg_law_of_cosine(c, a, b):
+    res = (c**2 - a**2 - b**2) / (-2*(a*b))
+    return acos(res)
+
 def dh_transform(q, alpha, a, d):
     return Matrix([[           cos(q),           -sin(q),           0,             a],
                    [sin(q)*cos(alpha), cos(q)*cos(alpha), -sin(alpha), -sin(alpha)*d],
                    [sin(q)*sin(alpha), cos(q)*sin(alpha),  cos(alpha),  cos(alpha)*d],
                    [                0,                 0,           0,             1]])
+
+def rot_x(q1):
+    return Matrix([[ 1,              0,        0],
+                   [ 0,        cos(q1), -sin(q1)],
+                   [ 0,        sin(q1),  cos(q1)]])
+
+def rot_y(q2):
+    return Matrix([[ cos(q2),        0,  sin(q2)],
+                   [       0,        1,        0],
+                   [-sin(q2),        0,  cos(q2)]])
+
+def rot_z(q3):
+    return Matrix([[ cos(q3), -sin(q3),        0],
+                   [ sin(q3),  cos(q3),        0],
+                   [ 0,              0,        1]])
+
+def make_homogeneous(R, t):
+    return R.row_join(t).col_join(Matrix([[0, 0, 0, 1]]))
     
 def IK_server():
     # initialize node and declare calculate_ik service
