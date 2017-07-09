@@ -15,7 +15,7 @@ import tf
 from kuka_arm.srv import *
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from geometry_msgs.msg import Pose
-#from mpmath import *
+from mpmath import *
 from sympy import *
 import timeit
 
@@ -66,13 +66,13 @@ def handle_calculate_IK(req):
             R5_6 = dh_rotation(q6, alpha5, a5, d6)
             R6_G = dh_rotation(q7, alpha6, a6, d7)
             
-            # T0_1 = dh_transform(q1, alpha0, a0, d1)
-            # T1_2 = dh_transform(q2, alpha1, a1, d2)
-            # T2_3 = dh_transform(q3, alpha2, a2, d3)
-            # T3_4 = dh_transform(q4, alpha3, a3, d4)
-            # T4_5 = dh_transform(q5, alpha4, a4, d5)
-            # T5_6 = dh_transform(q6, alpha5, a5, d6)
-            # T6_G = dh_transform(q7, alpha6, a6, d7)
+            T0_1 = dh_transform(q1, alpha0, a0, d1)
+            T1_2 = dh_transform(q2, alpha1, a1, d2)
+            T2_3 = dh_transform(q3, alpha2, a2, d3)
+            T3_4 = dh_transform(q4, alpha3, a3, d4)
+            T4_5 = dh_transform(q5, alpha4, a4, d5)
+            T5_6 = dh_transform(q6, alpha5, a5, d6)
+            T6_G = dh_transform(q7, alpha6, a6, d7)
 
             print("subs")
             R0_1 = R0_1.subs(s)
@@ -83,13 +83,13 @@ def handle_calculate_IK(req):
             R5_6 = R5_6.subs(s)
             R6_G = R6_G.subs(s)
             
-            # T0_1 = T0_1.subs(s)
-            # T1_2 = T1_2.subs(s)
-            # T2_3 = T2_3.subs(s)
-            #T3_4 = T3_4.subs(s)
-            #T4_5 = T4_5.subs(s)
-            #T5_6 = T5_6.subs(s)
-            #T6_G = T6_G.subs(s)
+            T0_1 = T0_1.subs(s)
+            T1_2 = T1_2.subs(s)
+            T2_3 = T2_3.subs(s)
+            T3_4 = T3_4.subs(s)
+            T4_5 = T4_5.subs(s)
+            T5_6 = T5_6.subs(s)
+            T6_G = T6_G.subs(s)
 
             print("simplifying")
             start_time = timeit.default_timer()
@@ -100,12 +100,12 @@ def handle_calculate_IK(req):
             R3_6 = R3_5 * R5_6
             R3_G = R3_6 * R6_G
             
-            # T0_2 = T0_1 * T1_2
-            # T0_3 = simplify(T0_2 * T2_3)
-            #T0_4 = T0_3 * T3_4
-            #T0_5 = T0_4 * T4_5
-            #T0_6 = T0_5 * T5_6
-            #T0_G = T0_6 * T6_G
+            T0_2 = simplify(T0_1 * T1_2)
+            T0_3 = simplify(T0_2 * T2_3)
+            T0_4 = simplify(T0_3 * T3_4)
+            T0_5 = simplify(T0_4 * T4_5)
+            T0_6 = simplify(T0_5 * T5_6)
+            T0_G = simplify(T0_6 * T6_G)
             end_time = timeit.default_timer() - start_time
             print("simplifying took {0}s".format(end_time))
 
@@ -114,12 +114,27 @@ def handle_calculate_IK(req):
             R_y = rot_y(-pi/2)
             R_corr = simplify(R_z * R_y)
 
+            R_z2 = make_homogeneous(rot_z(pi), Matrix([[0],[0],[0]]))
+            R_y2 = make_homogeneous(rot_y(-pi/2), Matrix([[0],[0],[0]]))
+            R_corr2 = simplify(R_z2 * R_y2)
+
             print("total matrix simplify")
             start_time = timeit.default_timer()
             R3_total = simplify(R3_G * R_corr)
-            #T0_total = simplify(T0_G * R_corr)
+            T0_total = simplify(T0_G * R_corr2)
             end_time = timeit.default_timer() - start_time
             print("simplifying total matrix took {0}s".format(end_time))
+
+            print("numerically evaling forward trans")
+            # print("T0_1 = {0}".format(T0_1.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_2 = {0}".format(T0_2.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_3 = {0}".format(T0_3.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_4 = {0}".format(T0_4.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_5 = {0}".format(T0_5.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_6 = {0}".format(T0_6.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            # print("T0_G = {0}".format(T0_G.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
+            A = T0_total.evalf(subs={q1: -1.69, q2: 1.02, q3: -3.58, q4: 0.74, q5: 1.78, q6: 3.07})
+            print("T0_total = {0},{1}".format(A, get_euler_angles(A)))
             
             # Extract end-effector position and orientation from request
 	    # px,py,pz = end-effector position
@@ -216,6 +231,12 @@ def rot_z(q3):
 
 def make_homogeneous(R, t):
     return R.row_join(t).col_join(Matrix([[0, 0, 0, 1]]))
+
+def get_euler_angles(T):
+    pitch = atan2(-T[2,0], sqrt(T[0,0]**2 + T[1,0]**2))
+    yaw = atan2(T[1,0],T[0,0])
+    roll = atan2(T[2,1],T[2,2])
+    return (roll, pitch, yaw)
     
 def IK_server():
     # initialize node and declare calculate_ik service
