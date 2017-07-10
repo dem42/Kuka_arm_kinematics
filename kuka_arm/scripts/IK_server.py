@@ -54,74 +54,73 @@ def handle_calculate_IK(req):
             
             # Define Modified DH Transformation matrix
             # defined in function dh_transform
-            
+
+
+            start_time = timeit.default_timer()
             # Create individual transformation matrices
             print("computing all the nice transforms")
 
             R0_1 = dh_rotation(q1, alpha0, a0, d1)
             R1_2 = dh_rotation(q2, alpha1, a1, d2)
             R2_3 = dh_rotation(q3, alpha2, a2, d3)
-            R3_4 = dh_rotation(q4, alpha3, a3, d4)
-            R4_5 = dh_rotation(q5, alpha4, a4, d5)
-            R5_6 = dh_rotation(q6, alpha5, a5, d6)
-            R6_G = dh_rotation(q7, alpha6, a6, d7)
+            # R3_4 = dh_rotation(q4, alpha3, a3, d4)
+            # R4_5 = dh_rotation(q5, alpha4, a4, d5)
+            # R5_6 = dh_rotation(q6, alpha5, a5, d6)
+            # R6_G = dh_rotation(q7, alpha6, a6, d7)
             
-            T0_1 = dh_transform(q1, alpha0, a0, d1)
-            T1_2 = dh_transform(q2, alpha1, a1, d2)
-            T2_3 = dh_transform(q3, alpha2, a2, d3)
-            T3_4 = dh_transform(q4, alpha3, a3, d4)
-            T4_5 = dh_transform(q5, alpha4, a4, d5)
-            T5_6 = dh_transform(q6, alpha5, a5, d6)
-            T6_G = dh_transform(q7, alpha6, a6, d7)
+            # T0_1 = dh_transform(q1, alpha0, a0, d1)
+            # T1_2 = dh_transform(q2, alpha1, a1, d2)
+            # T2_3 = dh_transform(q3, alpha2, a2, d3)
+            # T3_4 = dh_transform(q4, alpha3, a3, d4)
+            # T4_5 = dh_transform(q5, alpha4, a4, d5)
+            # T5_6 = dh_transform(q6, alpha5, a5, d6)
+            # T6_G = dh_transform(q7, alpha6, a6, d7)
 
             print("subs")
             R0_1 = R0_1.subs(s)
             R1_2 = R1_2.subs(s)
             R2_3 = R2_3.subs(s)
-            R3_4 = R3_4.subs(s)
-            R4_5 = R4_5.subs(s)
-            R5_6 = R5_6.subs(s)
-            R6_G = R6_G.subs(s)
+            # R3_4 = R3_4.subs(s)
+            # R4_5 = R4_5.subs(s)
+            # R5_6 = R5_6.subs(s)
+            # R6_G = R6_G.subs(s)
             
-            T0_1 = T0_1.subs(s)
-            T1_2 = T1_2.subs(s)
-            T2_3 = T2_3.subs(s)
-            T3_4 = T3_4.subs(s)
-            T4_5 = T4_5.subs(s)
-            T5_6 = T5_6.subs(s)
-            T6_G = T6_G.subs(s)
+            # T0_1 = T0_1.subs(s)
+            # T1_2 = T1_2.subs(s)
+            # T2_3 = T2_3.subs(s)
+            # T3_4 = T3_4.subs(s)
+            # T4_5 = T4_5.subs(s)
+            # T5_6 = T5_6.subs(s)
+            # T6_G = T6_G.subs(s)
 
             print("simplifying")
-            start_time = timeit.default_timer()
             R0_2 = R0_1 * R1_2
             R0_3 = simplify(R0_2 * R2_3)
 
-            R3_5 = R3_4 * R4_5
-            R3_6 = R3_5 * R5_6
-            R3_G = R3_6 * R6_G
+            # R3_5 = R3_4 * R4_5
+            # R3_6 = R3_5 * R5_6
+            # R3_G = R3_6 * R6_G
             
-            T0_2 = simplify(T0_1 * T1_2)
-            T0_3 = simplify(T0_2 * T2_3)
-            T0_4 = simplify(T0_3 * T3_4)
-            T0_5 = simplify(T0_4 * T4_5)
-            T0_6 = simplify(T0_5 * T5_6)
-            T0_G = simplify(T0_6 * T6_G)
-            end_time = timeit.default_timer() - start_time
-            print("simplifying took {0}s".format(end_time))
+            # T0_2 = (T0_1 * T1_2)
+            # T0_3 = (T0_2 * T2_3)
+            # T0_4 = (T0_3 * T3_4)
+            # T0_5 = (T0_4 * T4_5)
+            # T0_6 = (T0_5 * T5_6)
+            # T0_G = simplify(T0_6 * T6_G)
 
             print("correction matrix simplify")
-            R_z = rot_z(pi)
-            R_y = rot_y(-pi/2)
-            R_corr = simplify(R_z * R_y)
+            # R_z = rot_z(pi)
+            # R_y = rot_y(-pi/2)
+            # R_corr = simplify(R_z * R_y)
 
-            R_z2 = make_homogeneous(rot_z(pi), Matrix([[0],[0],[0]]))
-            R_y2 = make_homogeneous(rot_y(-pi/2), Matrix([[0],[0],[0]]))
-            R_corr2 = simplify(R_z2 * R_y2)
+            # R_z2 = make_homogeneous(rot_z(pi), Matrix([[0],[0],[0]]))
+            # R_y2 = make_homogeneous(rot_y(-pi/2), Matrix([[0],[0],[0]]))
+            # R_corr2 = simplify(R_z2 * R_y2)
 
             print("total matrix simplify")
-            start_time = timeit.default_timer()
-            R3_total = simplify(R3_G * R_corr)
-            T0_total = simplify(T0_G * R_corr2)
+
+            # R3_total = simplify(R3_G * R_corr)
+            # T0_total = simplify(T0_G * R_corr2)
             end_time = timeit.default_timer() - start_time
             print("simplifying total matrix took {0}s".format(end_time))
 
@@ -133,8 +132,8 @@ def handle_calculate_IK(req):
             # print("T0_5 = {0}".format(T0_5.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
             # print("T0_6 = {0}".format(T0_6.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
             # print("T0_G = {0}".format(T0_G.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})))
-            A = T0_total.evalf(subs={q1: -1.69, q2: 1.02, q3: -3.58, q4: 0.74, q5: 1.78, q6: 3.07})
-            print("T0_total = {0},{1}".format(A, get_euler_angles(A)))
+            # A = T0_total.evalf(subs={q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0})
+            # print("T0_total = {0},{1}".format(A, get_euler_angles(A)))
             
             # Extract end-effector position and orientation from request
 	    # px,py,pz = end-effector position
@@ -172,27 +171,40 @@ def handle_calculate_IK(req):
             ang3 = arg_law_of_cosine(dia, a2, d4)
             theta2 = ang2 + ang1
             theta3 = ang3 - pi
-            print("what? ({0},{1},{2},{3},{4}".format(r.evalf(subs=s), dia.evalf(subs=s), ang1.evalf(subs=s), ang2.evalf(subs=s), ang3.evalf(subs=s)))
-            print("Got first three angles ({0},{1},{2})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s)))
+            #print("what? ({0},{1},{2},{3},{4}".format(r.evalf(subs=s), dia.evalf(subs=s), ang1.evalf(subs=s), ang2.evalf(subs=s), ang3.evalf(subs=s)))
+            #print("Got first three angles ({0},{1},{2})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s)))
 
+
+            start_time0 = timeit.default_timer()
+            theta1 = theta1.subs(s)
+            theta2 = theta2.subs(s)
+            theta3 = theta3.subs(s)
             R0_3s = R0_3.subs({q1: theta1, q2: theta2, q3: theta3})
-            R3_6 = R0_3s.T * Rrpy
+            R3_6 = simplify(R0_3s.T * Rrpy)
+            end_time0 = timeit.default_timer() - start_time0
+            print("simplifying r3_6 took {0}s".format(end_time0))
 
             # T0_3s = T0_3.subs({q1: theta1, q2: theta2, q3: theta3})
             # T0_3s.col_del(-1)
             # T0_3s.row_del(-1)
             # R3_6 = T0_3s.T * Rrpy
-            
-            print("Got the final 3_6 matrix {0}\nCompare vs {1}".format(R3_6.evalf(subs=s),R3_G.evalf(subs=s)))
-            theta5 = acos(R3_6[1,2])
-            sin5 = sin(theta5)
-            theta4 = asin(R3_6[2,2] / sin5)
-            theta6 = acos(R3_6[1,0] / sin5)
 
-            print("about to return the values ({0},{1},{2})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s)))
+            #print("Got the final 3_6 matrix {0}".format(R3_6.evalf(subs=s)))
+            # print("Got the final 3_6 matrix {0}\nCompare vs {1}".format(R3_6.evalf(subs=s),R3_G.evalf(subs=s)))
+            start_time0 = timeit.default_timer()
+            theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_6)
+            end_time0 = timeit.default_timer() - start_time0
+            print("simplifying theta4,5,6 took {0}s".format(end_time0))
+
+           # print("about to return the values ({0},{1},{2},{3},{4},{5})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s), theta4.evalf(subs=s), theta5.evalf(subs=s), theta6.evalf(subs=s)))
             # Populate response for the IK request
             # In the next line replace theta1,theta2...,theta6 by your joint angle variables
-	    joint_trajectory_point.positions = [theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s), theta4.evalf(subs=s), theta5.evalf(subs=s), theta6.evalf(subs=s)]
+	    joint_trajectory_point.positions = [theta1.evalf(), theta2.evalf(), theta3.evalf(), theta4.evalf(), theta5.evalf(), theta6.evalf()]
+
+            end_time = timeit.default_timer() - start_time
+            print("simplifying took {0}s".format(end_time))
+            print("result {0}".format(joint_trajectory_point.positions))
+
 	    joint_trajectory_list.append(joint_trajectory_point)
 
         rospy.loginfo("length of Joint Trajectory List: %s" % len(joint_trajectory_list))
@@ -237,7 +249,13 @@ def get_euler_angles(T):
     yaw = atan2(T[1,0],T[0,0])
     roll = atan2(T[2,1],T[2,2])
     return (roll, pitch, yaw)
-    
+
+def get_euler_angles_from_homogeneous(T):
+    gamma = atan2(-T[1,1],T[1,0])
+    alpha = atan2(T[0,2],-T[2,2])
+    beta = atan2(sqrt(T[1,0]**2 + T[1,1]**2),T[1,2])
+    return (alpha, beta, gamma)
+
 def IK_server():
     # initialize node and declare calculate_ik service
     rospy.init_node('IK_server')
