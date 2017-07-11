@@ -63,10 +63,10 @@ def handle_calculate_IK(req):
             R0_1 = dh_rotation(q1, alpha0, a0, d1)
             R1_2 = dh_rotation(q2, alpha1, a1, d2)
             R2_3 = dh_rotation(q3, alpha2, a2, d3)
-            # R3_4 = dh_rotation(q4, alpha3, a3, d4)
-            # R4_5 = dh_rotation(q5, alpha4, a4, d5)
-            # R5_6 = dh_rotation(q6, alpha5, a5, d6)
-            # R6_G = dh_rotation(q7, alpha6, a6, d7)
+            R3_4 = dh_rotation(q4, alpha3, a3, d4)
+            R4_5 = dh_rotation(q5, alpha4, a4, d5)
+            R5_6 = dh_rotation(q6, alpha5, a5, d6)
+            R6_G = dh_rotation(q7, alpha6, a6, d7)
             
             # T0_1 = dh_transform(q1, alpha0, a0, d1)
             # T1_2 = dh_transform(q2, alpha1, a1, d2)
@@ -80,10 +80,10 @@ def handle_calculate_IK(req):
             R0_1 = R0_1.subs(s)
             R1_2 = R1_2.subs(s)
             R2_3 = R2_3.subs(s)
-            # R3_4 = R3_4.subs(s)
-            # R4_5 = R4_5.subs(s)
-            # R5_6 = R5_6.subs(s)
-            # R6_G = R6_G.subs(s)
+            R3_4 = R3_4.subs(s)
+            R4_5 = R4_5.subs(s)
+            R5_6 = R5_6.subs(s)
+            R6_G = R6_G.subs(s)
             
             # T0_1 = T0_1.subs(s)
             # T1_2 = T1_2.subs(s)
@@ -97,9 +97,9 @@ def handle_calculate_IK(req):
             R0_2 = R0_1 * R1_2
             R0_3 = simplify(R0_2 * R2_3)
 
-            # R3_5 = R3_4 * R4_5
-            # R3_6 = R3_5 * R5_6
-            # R3_G = R3_6 * R6_G
+            R3_5 = R3_4 * R4_5
+            R3_6 = R3_5 * R5_6
+            R3_G = R3_6 * R6_G
             
             # T0_2 = (T0_1 * T1_2)
             # T0_3 = (T0_2 * T2_3)
@@ -109,9 +109,9 @@ def handle_calculate_IK(req):
             # T0_G = simplify(T0_6 * T6_G)
 
             print("correction matrix simplify")
-            # R_z = rot_z(pi)
-            # R_y = rot_y(-pi/2)
-            # R_corr = simplify(R_z * R_y)
+            R_z = rot_z(pi)
+            R_y = rot_y(-pi/2)
+            R_corr = simplify(R_z * R_y)
 
             # R_z2 = make_homogeneous(rot_z(pi), Matrix([[0],[0],[0]]))
             # R_y2 = make_homogeneous(rot_y(-pi/2), Matrix([[0],[0],[0]]))
@@ -119,7 +119,7 @@ def handle_calculate_IK(req):
 
             print("total matrix simplify")
 
-            # R3_total = simplify(R3_G * R_corr)
+            R3_total = simplify(R3_G * R_corr)
             # T0_total = simplify(T0_G * R_corr2)
             end_time = timeit.default_timer() - start_time
             print("simplifying total matrix took {0}s".format(end_time))
@@ -146,7 +146,7 @@ def handle_calculate_IK(req):
             (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(
                 [req.poses[x].orientation.x, req.poses[x].orientation.y,
                     req.poses[x].orientation.z, req.poses[x].orientation.w])
-            rospy.loginfo("values: ({0},{1},{2}) ({3},{4},{5})".format(pz,py,pz,roll,pitch,yaw))
+            rospy.loginfo("values: ({0},{1},{2}) ({3},{4},{5})".format(px,py,pz,roll,pitch,yaw))
             # Calculate joint angles using Geometric IK method
             print("gonna calculate the IK")
             
@@ -154,23 +154,22 @@ def handle_calculate_IK(req):
             R_pitch = rot_y(pitch)
             R_yaw = rot_z(yaw)            
             Rrpy = R_roll * R_pitch * R_yaw
-            n = Rrpy.col(2)
 
-            d67 = d6 + d7
-            wx = px - (d67) * n[0]
-            wy = py - (d67) * n[1]
-            wz = pz - (d67) * n[2]
+            wx = px - d7 * Rrpy[0,2]
+            wy = py - d7 * Rrpy[1,2]
+            wz = pz - d7 * Rrpy[2,2]
             print("Got wrist center ({0},{1},{2})".format(wx, wy, wz))
 
             theta1 = atan2(wy, wx)
             r = sqrt(wy**2 + wx**2) - a1
-            vert_d = (wz - a3 - d1)
+            l = sqrt(d4**2 + a3**2)
+            vert_d = (wz - d1)
             dia = sqrt(r**2 + vert_d**2)
             ang1 = atan2(vert_d, r)
-            ang2 = arg_law_of_cosine(d4, a2, dia)
-            ang3 = arg_law_of_cosine(dia, a2, d4)
-            theta2 = ang2 + ang1
-            theta3 = ang3 - pi
+            ang2 = arg_law_of_cosine(l, a2, dia)
+            ang3 = arg_law_of_cosine(dia, a2, l)
+            theta2 = -(ang2 + ang1) + pi/2
+            theta3 = pi/2 - ang3
             #print("what? ({0},{1},{2},{3},{4}".format(r.evalf(subs=s), dia.evalf(subs=s), ang1.evalf(subs=s), ang2.evalf(subs=s), ang3.evalf(subs=s)))
             #print("Got first three angles ({0},{1},{2})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s)))
 
@@ -190,7 +189,7 @@ def handle_calculate_IK(req):
             # R3_6 = T0_3s.T * Rrpy
 
             #print("Got the final 3_6 matrix {0}".format(R3_6.evalf(subs=s)))
-            # print("Got the final 3_6 matrix {0}\nCompare vs {1}".format(R3_6.evalf(subs=s),R3_G.evalf(subs=s)))
+            print("Got the final 3_6 matrix {0}\nCompare vs {1}".format(R3_6.evalf(subs=s),R3_total.evalf(subs=s)))
             start_time0 = timeit.default_timer()
             theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_6)
             end_time0 = timeit.default_timer() - start_time0
@@ -251,9 +250,9 @@ def get_euler_angles(T):
     return (roll, pitch, yaw)
 
 def get_euler_angles_from_homogeneous(T):
-    gamma = atan2(-T[1,1],T[1,0])
-    alpha = atan2(T[0,2],-T[2,2])
-    beta = atan2(sqrt(T[1,0]**2 + T[1,1]**2),T[1,2])
+    gamma = atan2(T[1,1],T[1,2])
+    alpha = atan2(T[2,0],-T[0,0])
+    beta = atan2(sqrt(T[1,2]**2 + T[1,1]**2),T[1,0])
     return (alpha, beta, gamma)
 
 def IK_server():
