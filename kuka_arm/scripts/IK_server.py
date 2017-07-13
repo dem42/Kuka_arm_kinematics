@@ -80,10 +80,10 @@ def handle_calculate_IK(req):
             R0_1 = R0_1.subs(s)
             R1_2 = R1_2.subs(s)
             R2_3 = R2_3.subs(s)
-            R3_4 = R3_4.subs(s)
-            R4_5 = R4_5.subs(s)
-            R5_6 = R5_6.subs(s)
-            R6_G = R6_G.subs(s)
+            #R3_4 = R3_4.subs(s)
+            #R4_5 = R4_5.subs(s)
+            #R5_6 = R5_6.subs(s)
+            #R6_G = R6_G.subs(s)
             
             # T0_1 = T0_1.subs(s)
             # T1_2 = T1_2.subs(s)
@@ -97,9 +97,9 @@ def handle_calculate_IK(req):
             R0_2 = R0_1 * R1_2
             R0_3 = simplify(R0_2 * R2_3)
 
-            R3_5 = R3_4 * R4_5
-            R3_6 = R3_5 * R5_6
-            R3_G = R3_6 * R6_G
+            #R3_5 = R3_4 * R4_5
+            #R3_6 = R3_5 * R5_6
+            #R3_G = R3_6 * R6_G
             
             # T0_2 = (T0_1 * T1_2)
             # T0_3 = (T0_2 * T2_3)
@@ -119,7 +119,7 @@ def handle_calculate_IK(req):
 
             print("total matrix simplify")
 
-            R3_total = simplify(R3_G * R_corr)
+            #R3_total = simplify(R3_G * R_corr)
             # T0_total = simplify(T0_G * R_corr2)
             end_time = timeit.default_timer() - start_time
             print("simplifying total matrix took {0}s".format(end_time))
@@ -152,13 +152,14 @@ def handle_calculate_IK(req):
             
             R_roll = rot_x(roll)
             R_pitch = rot_y(pitch)
-            R_yaw = rot_z(yaw)            
+            R_yaw = rot_z(yaw)
             Rrpy = R_roll * R_pitch * R_yaw
+            Rrpy2 = Rrpy * R_corr
 
-            wx = px - d7 * Rrpy[0,2]
-            wy = py - d7 * Rrpy[1,2]
-            wz = pz - d7 * Rrpy[2,2]
-            print("Got wrist center ({0},{1},{2})".format(wx, wy, wz))
+            wx = px - d7 * Rrpy2[0,2]
+            wy = py - d7 * Rrpy2[1,2]
+            wz = pz - d7 * Rrpy2[2,2]
+            #print("Got wrist center ({0},{1},{2}) with rpy {3} and r_corr {4}".format(wx.evalf(), wy.evalf(), wz.evalf(),Rrpy, R_corr))
 
             theta1 = atan2(wy, wx)
             r = sqrt(wy**2 + wx**2) - a1
@@ -179,7 +180,7 @@ def handle_calculate_IK(req):
             theta2 = theta2.subs(s)
             theta3 = theta3.subs(s)
             R0_3s = R0_3.subs({q1: theta1, q2: theta2, q3: theta3})
-            R3_6 = simplify(R0_3s.T * Rrpy)
+            R3_G = simplify(R0_3s.T * Rrpy)
             end_time0 = timeit.default_timer() - start_time0
             print("simplifying r3_6 took {0}s".format(end_time0))
 
@@ -189,9 +190,9 @@ def handle_calculate_IK(req):
             # R3_6 = T0_3s.T * Rrpy
 
             #print("Got the final 3_6 matrix {0}".format(R3_6.evalf(subs=s)))
-            print("Got the final 3_6 matrix {0}\nCompare vs {1}".format(R3_6.evalf(subs=s),R3_total.evalf(subs=s)))
+            #print("Got the final 3_G matrix {0}\nCompare vs {1}\n vs {2}".format(R3_G.evalf(subs=s),R3_total.evalf(subs=s),R0_3s.evalf()))
             start_time0 = timeit.default_timer()
-            theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_6)
+            theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_G)
             end_time0 = timeit.default_timer() - start_time0
             print("simplifying theta4,5,6 took {0}s".format(end_time0))
 
