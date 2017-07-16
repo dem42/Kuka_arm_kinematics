@@ -18,7 +18,8 @@ from geometry_msgs.msg import Pose
 from mpmath import *
 from sympy import *
 import timeit
-
+import pickle
+import os.path
 
 def handle_calculate_IK(req):
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
@@ -26,7 +27,6 @@ def handle_calculate_IK(req):
         print "No valid poses received"
         return -1
     else:
-        rospy.loginfo("Pose: %s", req.poses[0])
         # Initialize service response
         joint_trajectory_list = []
         for x in xrange(0, len(req.poses)):
@@ -57,9 +57,7 @@ def handle_calculate_IK(req):
             # defined in function dh_transform
 
 
-            #start_time = timeit.default_timer()
             # Create individual transformation matrices
-
             R0_1 = dh_rotation(q1, alpha0, a0, d1)
             R1_2 = dh_rotation(q2, alpha1, a1, d2)
             R2_3 = dh_rotation(q3, alpha2, a2, d3)
@@ -67,42 +65,36 @@ def handle_calculate_IK(req):
             # R4_5 = dh_rotation(q5, alpha4, a4, d5)
             # R5_6 = dh_rotation(q6, alpha5, a5, d6)
             # R6_G = dh_rotation(q7, alpha6, a6, d7)
-            #print("rotation matrix setup took {0}".format(timeit.default_timer() - start_time))
             
 
-            #start_time = timeit.default_timer()
             R0_1 = R0_1.subs(dh)
             R1_2 = R1_2.subs(dh)
             R2_3 = R2_3.subs(dh)
-            #print("subs took {0}".format(timeit.default_timer() - start_time))
             #R3_4 = R3_4.subs(s)
             #R4_5 = R4_5.subs(s)
             #R5_6 = R5_6.subs(s)
             #R6_G = R6_G.subs(s)
             
 
-            #start_time = timeit.default_timer()
             R0_2 = R0_1 * R1_2
             R0_3 = R0_2 * R2_3
-            #print("r0_3 computation took {0}s".format(timeit.default_timer() - start_time))
             #R3_5 = R3_4 * R4_5
             #R3_6 = R3_5 * R5_6
             #R3_G = R3_6 * R6_G
 
-            #start_time = timeit.default_timer()
             R_z = rot_z(pi)
             R_y = rot_y(-pi/2)
             R_corr = simplify(R_z * R_y)
-            #print("r_corr took {0}s".format(timeit.default_timer() - start_time))
+
+            R_z_r = rot_y(pi/2)
+            R_y_r = rot_z(-pi)
+            R_corr_rev = simplify(R_z_r * R_y_r)
             
-
-
             #R3_total = simplify(R3_G * R_corr)
             
             # Extract end-effector position and orientation from request
 	    # px,py,pz = end-effector position
 	    # roll, pitch, yaw = end-effector orientation
-            #start_time = timeit.default_timer()
             px = req.poses[x].position.x
             py = req.poses[x].position.y
             pz = req.poses[x].position.z
@@ -111,22 +103,19 @@ def handle_calculate_IK(req):
                 [req.poses[x].orientation.x, req.poses[x].orientation.y,
                     req.poses[x].orientation.z, req.poses[x].orientation.w])
             rospy.loginfo("values: ({0},{1},{2}) ({3},{4},{5})".format(px,py,pz,roll,pitch,yaw))
-            #print("extracting from poses took {0}s".format(timeit.default_timer() - start_time))
             # Calculate joint angles using Geometric IK method
 
-            #start_time = timeit.default_timer()
             R_roll = rot_x(roll)
             R_pitch = rot_y(pitch)
             R_yaw = rot_z(yaw)
-            Rrpy = R_roll * R_pitch * R_yaw
-            Rrpy_cor = Rrpy * R_corr
-            #print("rpy matrices took {0}s".format(timeit.default_timer() - start_time))
+            Rrpy = R_yaw * R_pitch * R_roll
+            Rrpy_cor = Rrpy * R_corr_rev
 
-            #start_time = timeit.default_timer()
             wx = px - dh[d7] * Rrpy_cor[0,2]
             wy = py - dh[d7] * Rrpy_cor[1,2]
             wz = pz - dh[d7] * Rrpy_cor[2,2]
-            #print("Got wrist center ({0},{1},{2}) with rpy {3} and r_corr {4}".format(wx.evalf(), wy.evalf(), wz.evalf(),Rrpy, R_corr))
+            #print("Got wrist center ({0},{1},{2})".format(wx, wy, wz))
+            #print("Got wrist center ({0},{1},{2}) with r_corr {3}".format(wx, wy, wz,R_corr_rev))
 
             theta1 = atan2(wy, wx)
             p = sqrt(wy**2 + wx**2) - dh[a1]
@@ -136,43 +125,32 @@ def handle_calculate_IK(req):
             ang1 = atan2(o, p)
             ang2 = arg_law_of_cosine(f, dh[a2], s)
             ang3 = arg_law_of_cosine(s, dh[a2], f)
-            theta2 = -(ang2 + ang1) + pi/2
-            theta3 = pi/2 - ang3
-            #print("wrist joint pos took {0}s".format(timeit.default_timer() - start_time))
+            theta2 = pi/2 - ang2 - ang1
+            theta3 = pi/2 - ang3 + atan2(dh[a3], dh[d4])
             
             #print("wrist ({0},{1},{2})".format(wx,wy,wz))
             #print("offsets ({0},{1},{2},{3},{4})".format(s[a1],s[a2],s[a3],s[d1],s[d4]))
             #print("what? ({0},{1},{2},{3},{4},{5},{6}".format(p, f, o, s, ang1, ang2, ang3))
             #print("Got first three angles ({0},{1},{2})".format(theta1, theta2, theta3))
 
-            # start_time = timeit.default_timer()
-            # theta1 = theta1.subs(s)
-            # theta2 = theta2.subs(s)
-            # theta3 = theta3.subs(s)
-            # print("theta subs took {0}s".format(timeit.default_timer() - start_time))
-            #start_time = timeit.default_timer()
+
             R0_3s = R0_3.subs({q1: theta1, q2: theta2, q3: theta3})
-            #print("r0_3 subs took {0}s".format(timeit.default_timer() - start_time))
-            #start_time = timeit.default_timer()
             R3_G = R0_3s.T * Rrpy
-            #print("simplifying r3_6 took {0}s".format(timeit.default_timer() - start_time))
 
             #print("Got the final 3_6 matrix {0}".format(R3_6.evalf(subs=s)))
             #print("Got the final 3_G matrix {0}\nCompare vs {1}\n vs {2}".format(R3_G.evalf(subs=s),R3_total.evalf(subs=s),R0_3s.evalf()))
-            #start_time = timeit.default_timer()
             theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_G)
-            #print("simplifying theta4,5,6 took {0}s".format(timeit.default_timer() - start_time))
 
            # print("about to return the values ({0},{1},{2},{3},{4},{5})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s), theta4.evalf(subs=s), theta5.evalf(subs=s), theta6.evalf(subs=s)))
             # Populate response for the IK request
             # In the next line replace theta1,theta2...,theta6 by your joint angle variables
 
-            #start_time = timeit.default_timer()
 	    joint_trajectory_point.positions = [theta1.evalf(), theta2.evalf(), theta3.evalf(), theta4.evalf(), theta5.evalf(), theta6.evalf()]
-            #print("evalf trajectory took {0}s".format(timeit.default_timer() - start_time))
-            print("result {0}".format(joint_trajectory_point.positions))
+            res_fwd = get_forward_kinematics(*(joint_trajectory_point.positions))
+            error([px,py,pz,roll,pitch,yaw], res_fwd)
+            print("result {0}".format(*(joint_trajectory_point.positions)))
 
-            print("took {0}s. {1}/{2}".format(timeit.default_timer() - start_time0, (x+1), len(req.poses)))
+            print("took {0}s. Done: {1}/{2}".format(timeit.default_timer() - start_time0, (x+1), len(req.poses)))
             
 	    joint_trajectory_list.append(joint_trajectory_point)
 
@@ -180,12 +158,18 @@ def handle_calculate_IK(req):
         return CalculateIKResponse(joint_trajectory_list)
 
 
+def error(pos1, pos2):
+    error = sqrt(sum([(x - y)**2 for (x,y) in zip(pos1,pos2)])).evalf()
+    print("input: {0} vs output: {1}, with error = {2}".format(pos1, pos2, error))
+    
 def arg_law_of_cosine(c, a, b):
-    # if for whatever reason the input is not a triangle (out of workspace point?)
-    # then return angle=0
-    if c > a + b or a > c + b or b > c + a:
-        print("out of envelope {0},{1},{2}".format(c,a,b))
+    # check if input isnt a triangle (out of workspace point)
+    if c > a + b:
+        print("case1, out {0},{1},{2}".format(c,a,b))
         return pi
+    if a > c + b or b > c + a:
+        print("case2, out of envelope {0},{1},{2}".format(c,a,b))
+        return 0
     res = (c**2 - a**2 - b**2) / (-2*(a*b))
     return acos(res)
 
@@ -219,7 +203,7 @@ def make_homogeneous(R, t):
     return R.row_join(t).col_join(Matrix([[0, 0, 0, 1]]))
 
 
-def get_forward_kinematics_matrix(j1,j2,j3,j4,j5,j6):
+def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
 
     d1, d2, d3, d4, d5, d6, d7 = symbols("d1:8")
     a0, a1, a2, a3, a4, a5, a6 = symbols("a0:7")
@@ -233,6 +217,14 @@ def get_forward_kinematics_matrix(j1,j2,j3,j4,j5,j6):
          alpha4:  pi/2, a4:      0, d5:     0,
          alpha5: -pi/2, a5:      0, d6:     0,
          alpha6:     0, a6:      0, d7: 0.303,         q7: 0}
+
+    # forward kinematics take long to compute so we store the matrix
+    if os.path.isfile('total_dh.pickle'):
+        with open('total_dh.pickle', 'rb') as inf:
+            T0_total = pickle.loads(inf.read())
+            A = T0_total.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})
+            r, p, y = get_euler_angles(A)
+            return A[0,3], A[1,3], A[2,3], r, p, y
     
     T0_1 = dh_transform(q1, alpha0, a0, d1)
     T1_2 = dh_transform(q2, alpha1, a1, d2)
@@ -263,15 +255,20 @@ def get_forward_kinematics_matrix(j1,j2,j3,j4,j5,j6):
 
     T0_total = simplify(T0_G * R_corr)
 
-    print("T0_1 = {0}".format(T0_1.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_2 = {0}".format(T0_2.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_3 = {0}".format(T0_3.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_4 = {0}".format(T0_4.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_5 = {0}".format(T0_5.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_6 = {0}".format(T0_6.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
-    print("T0_G = {0}".format(T0_G.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    with open('total_dh.pickle', 'wb') as outf:
+        outf.write(pickle.dumps(T0_total))
+
+    # print("T0_1 = {0}".format(T0_1.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_2 = {0}".format(T0_2.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_3 = {0}".format(T0_3.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_4 = {0}".format(T0_4.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_5 = {0}".format(T0_5.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_6 = {0}".format(T0_6.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
+    # print("T0_G = {0}".format(T0_G.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
     A = T0_total.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})
     print("T0_total = {0},{1}".format(A, get_euler_angles(A)))
+    r, p, y = get_euler_angles(A)
+    return A[0,3], A[1,3], A[2,3], r, p, y 
 
 def get_euler_angles(T):
     pitch = atan2(-T[2,0], sqrt(T[0,0]**2 + T[1,0]**2))
@@ -286,6 +283,7 @@ def get_euler_angles_from_homogeneous(T):
     return (alpha, beta, gamma)
 
 def IK_server():
+    print(get_forward_kinematics(0,0,0,0,0,0))
     # initialize node and declare calculate_ik service
     rospy.init_node('IK_server')
     s = rospy.Service('calculate_ik', CalculateIK, handle_calculate_IK)
