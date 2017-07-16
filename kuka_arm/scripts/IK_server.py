@@ -21,7 +21,7 @@ import timeit
 import pickle
 import os.path
 
-def handle_calculate_IK(req):
+def handle_calculate_IK(req, check_error = True):
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
     if len(req.poses) < 1:
         print "No valid poses received"
@@ -61,26 +61,14 @@ def handle_calculate_IK(req):
             R0_1 = dh_rotation(q1, alpha0, a0, d1)
             R1_2 = dh_rotation(q2, alpha1, a1, d2)
             R2_3 = dh_rotation(q3, alpha2, a2, d3)
-            # R3_4 = dh_rotation(q4, alpha3, a3, d4)
-            # R4_5 = dh_rotation(q5, alpha4, a4, d5)
-            # R5_6 = dh_rotation(q6, alpha5, a5, d6)
-            # R6_G = dh_rotation(q7, alpha6, a6, d7)
-            
 
             R0_1 = R0_1.subs(dh)
             R1_2 = R1_2.subs(dh)
             R2_3 = R2_3.subs(dh)
-            #R3_4 = R3_4.subs(s)
-            #R4_5 = R4_5.subs(s)
-            #R5_6 = R5_6.subs(s)
-            #R6_G = R6_G.subs(s)
             
 
             R0_2 = R0_1 * R1_2
             R0_3 = R0_2 * R2_3
-            #R3_5 = R3_4 * R4_5
-            #R3_6 = R3_5 * R5_6
-            #R3_G = R3_6 * R6_G
 
             R_z = rot_z(pi)
             R_y = rot_y(-pi/2)
@@ -90,7 +78,6 @@ def handle_calculate_IK(req):
             R_y_r = rot_z(-pi)
             R_corr_rev = simplify(R_z_r * R_y_r)
             
-            #R3_total = simplify(R3_G * R_corr)
             
             # Extract end-effector position and orientation from request
 	    # px,py,pz = end-effector position
@@ -103,53 +90,49 @@ def handle_calculate_IK(req):
                 [req.poses[x].orientation.x, req.poses[x].orientation.y,
                     req.poses[x].orientation.z, req.poses[x].orientation.w])
             rospy.loginfo("values: ({0},{1},{2}) ({3},{4},{5})".format(px,py,pz,roll,pitch,yaw))
-            # Calculate joint angles using Geometric IK method
 
+            # Calculate joint angles using Geometric IK method
+            # Compute wrist joint location by moving along the dh z-axis of the gripper (need apply a correction first)
             R_roll = rot_x(roll)
             R_pitch = rot_y(pitch)
             R_yaw = rot_z(yaw)
+            # instrinsic rotation from euler angles
             Rrpy = R_yaw * R_pitch * R_roll
             Rrpy_cor = Rrpy * R_corr_rev
 
             wx = px - dh[d7] * Rrpy_cor[0,2]
             wy = py - dh[d7] * Rrpy_cor[1,2]
             wz = pz - dh[d7] * Rrpy_cor[2,2]
-            #print("Got wrist center ({0},{1},{2})".format(wx, wy, wz))
-            #print("Got wrist center ({0},{1},{2}) with r_corr {3}".format(wx, wy, wz,R_corr_rev))
 
-            theta1 = atan2(wy, wx)
+            # Compute problem of position using law of cosine
             p = sqrt(wy**2 + wx**2) - dh[a1]
             f = sqrt(dh[d4]**2 + dh[a3]**2)
             o = (wz - dh[d1])
             s = sqrt(p**2 + o**2)
             ang1 = atan2(o, p)
-            ang2 = arg_law_of_cosine(f, dh[a2], s)
-            ang3 = arg_law_of_cosine(s, dh[a2], f)
+            ang2 = arg_law_of_cosine(f, dh[a2], s, 0)
+            ang3 = arg_law_of_cosine(s, dh[a2], f, pi)
+
+            theta1 = atan2(wy, wx)
             theta2 = pi/2 - ang2 - ang1
             theta3 = pi/2 - ang3 + atan2(dh[a3], dh[d4])
             
-            #print("wrist ({0},{1},{2})".format(wx,wy,wz))
-            #print("offsets ({0},{1},{2},{3},{4})".format(s[a1],s[a2],s[a3],s[d1],s[d4]))
-            #print("what? ({0},{1},{2},{3},{4},{5},{6}".format(p, f, o, s, ang1, ang2, ang3))
-            #print("Got first three angles ({0},{1},{2})".format(theta1, theta2, theta3))
-
-
+            # Compute problem of wrist orientation using the roll,pitch,yaw matrix constructed from euler rotations
             R0_3s = R0_3.subs({q1: theta1, q2: theta2, q3: theta3})
             R3_G = R0_3s.T * Rrpy
 
-            #print("Got the final 3_6 matrix {0}".format(R3_6.evalf(subs=s)))
-            #print("Got the final 3_G matrix {0}\nCompare vs {1}\n vs {2}".format(R3_G.evalf(subs=s),R3_total.evalf(subs=s),R0_3s.evalf()))
             theta4, theta5, theta6 = get_euler_angles_from_homogeneous(R3_G)
 
-           # print("about to return the values ({0},{1},{2},{3},{4},{5})".format(theta1.evalf(subs=s), theta2.evalf(subs=s), theta3.evalf(subs=s), theta4.evalf(subs=s), theta5.evalf(subs=s), theta6.evalf(subs=s)))
+
             # Populate response for the IK request
-            # In the next line replace theta1,theta2...,theta6 by your joint angle variables
-
 	    joint_trajectory_point.positions = [theta1.evalf(), theta2.evalf(), theta3.evalf(), theta4.evalf(), theta5.evalf(), theta6.evalf()]
-            res_fwd = get_forward_kinematics(*(joint_trajectory_point.positions))
-            error([px,py,pz,roll,pitch,yaw], res_fwd)
-            print("result {0}".format(*(joint_trajectory_point.positions)))
 
+            # Perfom an optional error computation
+            if check_error:
+                res_fwd = get_forward_kinematics(*(joint_trajectory_point.positions))
+                error([px,py,pz,roll,pitch,yaw], res_fwd)
+                
+            print("result {0}".format(*(joint_trajectory_point.positions)))
             print("took {0}s. Done: {1}/{2}".format(timeit.default_timer() - start_time0, (x+1), len(req.poses)))
             
 	    joint_trajectory_list.append(joint_trajectory_point)
@@ -162,14 +145,11 @@ def error(pos1, pos2):
     error = sqrt(sum([(x - y)**2 for (x,y) in zip(pos1,pos2)])).evalf()
     print("input: {0} vs output: {1}, with error = {2}".format(pos1, pos2, error))
     
-def arg_law_of_cosine(c, a, b):
+def arg_law_of_cosine(c, a, b, fallback):
     # check if input isnt a triangle (out of workspace point)
-    if c > a + b:
-        print("case1, out {0},{1},{2}".format(c,a,b))
-        return pi
-    if a > c + b or b > c + a:
-        print("case2, out of envelope {0},{1},{2}".format(c,a,b))
-        return 0
+    if c > a + b or a > c + b or b > c + a:
+        print("Out of envelope {0},{1},{2}".format(c,a,b))
+        return fallback
     res = (c**2 - a**2 - b**2) / (-2*(a*b))
     return acos(res)
 
@@ -202,9 +182,21 @@ def rot_z(q3):
 def make_homogeneous(R, t):
     return R.row_join(t).col_join(Matrix([[0, 0, 0, 1]]))
 
+def print_homogeneous_transform():
+    a, b, c = symbols("a,b,c")
+    px, py, pz = symbols("px,py,pz")
+    R_roll = rot_x(a)
+    R_pitch = rot_y(b)
+    R_yaw = rot_z(c)
+    # instrinsic rotation from euler angles
+    Rrpy = R_yaw * R_pitch * R_roll
+    pprint(make_homogeneous(Rrpy, Matrix([[px],[py],[pz]])))
+
 
 def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
 
+    dh_filename = 'total_dh.pickle'
+    
     d1, d2, d3, d4, d5, d6, d7 = symbols("d1:8")
     a0, a1, a2, a3, a4, a5, a6 = symbols("a0:7")
     alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols("alpha0:7")
@@ -219,8 +211,8 @@ def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
          alpha6:     0, a6:      0, d7: 0.303,         q7: 0}
 
     # forward kinematics take long to compute so we store the matrix
-    if os.path.isfile('total_dh.pickle'):
-        with open('total_dh.pickle', 'rb') as inf:
+    if os.path.isfile(dh_filename):
+        with open(dh_filename, 'rb') as inf:
             T0_total = pickle.loads(inf.read())
             A = T0_total.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})
             r, p, y = get_euler_angles(A)
@@ -241,6 +233,14 @@ def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
     T4_5 = T4_5.subs(s)
     T5_6 = T5_6.subs(s)
     T6_G = T6_G.subs(s)
+
+    # pprint(T0_1)
+    # pprint(T1_2)
+    # pprint(T2_3)
+    # pprint(T3_4)
+    # pprint(T4_5)
+    # pprint(T5_6)
+    # pprint(T6_G)
     
     T0_2 = (T0_1 * T1_2)
     T0_3 = (T0_2 * T2_3)
@@ -255,7 +255,7 @@ def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
 
     T0_total = simplify(T0_G * R_corr)
 
-    with open('total_dh.pickle', 'wb') as outf:
+    with open(dh_filename, 'wb') as outf:
         outf.write(pickle.dumps(T0_total))
 
     # print("T0_1 = {0}".format(T0_1.evalf(subs={q1: j1, q2: j2, q3: j3, q4: j4, q5: j5, q6: j6})))
@@ -283,7 +283,8 @@ def get_euler_angles_from_homogeneous(T):
     return (alpha, beta, gamma)
 
 def IK_server():
-    print(get_forward_kinematics(0,0,0,0,0,0))
+    #print_homogeneous_transform()
+    #get_forward_kinematics(0,0,0,0,0,0)
     # initialize node and declare calculate_ik service
     rospy.init_node('IK_server')
     s = rospy.Service('calculate_ik', CalculateIK, handle_calculate_IK)
