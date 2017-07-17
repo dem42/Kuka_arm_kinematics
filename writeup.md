@@ -159,6 +159,9 @@ The following image shows how I obtain the projections of the triangles to compu
 The equations I use to compute the first three joint angles are given in the below image:
 ![alt text][image5]
 
+Using the previous intermediate values I compute the second and thrid joint angle as follows, using the fast that the base, 0 angle configuration is 90 degrees in both cases:
+![alt text][image6]
+
 In the next image I show an example of the trianlge in the default configuration with all the angles set to 0 and an example where there are multiple solutions. By always adding $$\gamma1$$ and $$\gamma2$$ I implicitly always choose the solution with the arm going up.
 ![alt text][image4]
 
