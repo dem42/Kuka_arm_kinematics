@@ -192,6 +192,10 @@ def print_homogeneous_transform():
     Rrpy = R_yaw * R_pitch * R_roll
     pprint(make_homogeneous(Rrpy, Matrix([[px],[py],[pz]])))
 
+    q, alpha, a, d = symbols("q,alpha,a,d")
+    T = dh_transform(q, alpha, a, d)
+    pprint(T)
+
 
 def get_forward_kinematics(j1,j2,j3,j4,j5,j6):
 
