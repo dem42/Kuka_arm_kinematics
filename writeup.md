@@ -8,6 +8,7 @@
 [image4]: ./misc_images/triangles1-1.jpg
 [image5]: ./misc_images/equations-1.jpg
 [image6]: ./misc_images/equations2-1.jpg
+[image7]: ./misc_images/equations3-1.jpg
 
 ### Writeup 
 
@@ -170,7 +171,7 @@ The computation of inverse orientation was explained in the lectures so I just f
 $$R3_6 = R0_3^{T} * R_{roll,pitch,yaw}$$
 
 The computation of the last three joint angles is done by matching the LHS to the RHS of the previous equation. The LHS is given by a matrix and the RHS are just numbers. The following image shows the LHS matrix and the computation of the three angles from this matrix
-![alt text][image6]
+![alt text][image7]
 
 ### Project Implementation
 
