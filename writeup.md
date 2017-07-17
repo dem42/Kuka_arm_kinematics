@@ -36,7 +36,7 @@ For example `joint_1` of urdf has `<origin xyz="0 0 0.33" rpy="0 0 0"/>` and `jo
 The $$\alpha$$ twist angles are obtained by checking if the reference frame axes of joints $$i-1$$ and $$i$$ are perpendicular or not. If they are then the $$\alpha$$ is $$\pi/2$$ either negative or positive based on the direction of rotation.
 
 The reference frames that I chose for the DH parameterization of the Kuka210 arm are shown in the image below:
-![alt text][image1]
+![alt text][image1 =250px]
 
 The modified DH parameters for the Kuka210 arm are:
 
@@ -155,23 +155,23 @@ $$W = P_{end-effector} - d_{7} * R_{roll,pitch,yaw} * R_{correction} * [0, 0, 1]
 Using the wrist I can compute $$\theta_1$$ easily just by projecting $$W_{z}$$ to the x-y plane. Then $$theta_2$$ and $$theta_3$$ I compute using the law of cosines. I noticed that there is a triangle spanned by the joint origins two and three and the wrist joint. I can compute the angles of this triangle and they will be within $$(0,180)$$ degrees. Next I can compute the signed angle $$\gamma_1$$ using `atan2` and that gives me the formulas for $$theta_2$$ and $$theta_3$$ as follows:
 
 The following image shows how I obtain the projections of the triangles to compute the joint angles
-![alt text][image3]
+![alt text][image3 =250px]
 
 The equations I use to compute the first three joint angles are given in the below image:
-![alt text][image5]
+![alt text][image5 =250px]
 
 Using the previous intermediate values I compute the second and thrid joint angle as follows, using the fast that the base, 0 angle configuration is 90 degrees in both cases:
-![alt text][image6]
+![alt text][image6 =250px]
 
 In the next image I show an example of the triangle in the default configuration with all the angles set to 0 and an example where there are multiple solutions. By always adding $$\gamma1$$ and $$\gamma2$$ I implicitly always choose the solution with the arm going up.
-![alt text][image4]
+![alt text][image4 =250px]
 
 The computation of inverse orientation was explained in the lectures, so I just follow that technique of equating the total, corrected DH rotation with the rotation obtained using the end-effector pose because they must match. Then I can just multiply from the left using the inverse of the rotation $R0_3$ (or the transpose since this is a rotation matrix). The result is a matrix which I can solve by extracing the euler angles using the $$atan2$$ trick where I note that $$tan(a) = sin(a) / cos(a)$$.
 
 $$R3_6 = R0_3^{T} * R_{roll,pitch,yaw}$$
 
 The computation of the last three joint angles is done by matching the LHS to the RHS of the previous equation. The LHS is given by a matrix with variables and the RHS is a matrix of just numbers. The following image shows the LHS matrix and the computation of the three angles from this matrix:
-![alt text][image7]
+![alt text][image7 =250px]
 
 ### Project Implementation
 
