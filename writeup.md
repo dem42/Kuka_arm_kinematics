@@ -2,9 +2,12 @@
 
 [//]: # (Image References)
 
-[image1]: ./misc_images/misc1.png
-[image2]: ./misc_images/misc2.png
-[image3]: ./misc_images/misc3.png
+[image1]: ./misc_images/robot1-1.jpg
+[image2]: ./misc_images/robot2-1.jpg
+[image3]: ./misc_images/triangles0-1.jpg
+[image4]: ./misc_images/triangles1-1.jpg
+[image5]: ./misc_images/equations-1.jpg
+[image6]: ./misc_images/equations2-1.jpg
 
 ### Writeup 
 
@@ -43,6 +46,7 @@ Joint | $$\alpha_{i-1}$$ | $$a_{i-1}$$ | $$d_i$$ | $$\theta_i$$ |
 6 | $$-\pi/2$$ | 0 | 0 | 0
 G | 0 | 0 | 0.303 | 0
 
+The reference frames that I chose for the DH parameterization of the Kuka210 arm are shown in the image below:
 ![alt text][image1]
 
 #### 2. Using the DH parameter table you derived earlier, create individual transformation matrices about each joint. In addition, also generate a generalized homogeneous transform between base_link and gripper_link using only end-effector(gripper) pose.
@@ -149,10 +153,21 @@ $$W = P_{end-effector} - d_{7} * R_{roll,pitch,yaw} * R_{correction} * [0, 0, 1]
 
 Using the wrist I can compute $$\theta_1$$ easily just by projecting $$W_{z}$$ to the x-y plane. Then $$theta_2$$ and $$theta_3$$ I compute using the law of cosines. I noticed that there is a triangle spanned by the joints origins two and three and the wrist joint. I can compute the angles of this triangle and they will be within $$(0,180)$$ degrees. Next I can compute the signed angle $$\gamma_1$$ which using `atan2` and that gives me the formulates for $$theta_2$$ and $$theta_3$$ as follows:
 
+The following image shows how I obtain the projections of the triangles to compute the joint angles
+![alt text][image3]
+
+The equations I use to compute the first three joint angles are given in the below image:
+![alt text][image5]
+
+In the next image I show an example of the trianlge in the default configuration with all the angles set to 0 and an example where there are multiple solutions. By always adding $$\gamma1$$ and $$\gamma2$$ I implicitly always choose the solution with the arm going up.
+![alt text][image4]
 
 The computation of inverse orientation was explained in the lectures so I just follow that technique of equating the total, corrected DH rotation with the rotation obtained using the end-effector pose because they must match. The I can just multiply from the left using the inverse of the rotation $R0_3$ (or the transpose since this is a rotation matrix). The result is a matrix which I can solve by extracing the euler angles using the $$atan2$$ trick where I note that $$tan(a) = sin(a) / cos(a)$$.
 
-![alt text][image2]
+$$R3_6 = R0_3^{T} * R_{roll,pitch,yaw}$$
+
+The computation of the last three joint angles is done by matching the LHS to the RHS of the previous equation. The LHS is given by a matrix and the RHS are just numbers. The following image shows the LHS matrix and the computation of the three angles from this matrix
+![alt text][image6]
 
 ### Project Implementation
 
@@ -165,8 +180,3 @@ In the final code I added the optional parameter `check_error` to `handle_calcul
 The Kuka arm performs very well. I have not seen it fail to pick and place. Sometimes, however **the kuka robot rotates its wrist a lot without moving**. I believe this is because I just compute any angles that give the correct end-effector position, however there may be another correct solution which is closer to the current angle configuration and which wouldn't require so much rotating. A potential improvement could be to try to find a solution which requires as little rotating as possible.
 
 Another possible problem with my solution is that I don't not impose constraints on joint variables. So it could happen that my solution suggests a joint angle that cannot be reached. I have not seen it happen, but I think it's very much possible.
-
-And just for fun, another example image:
-![alt text][image3]
-
-
